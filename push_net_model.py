@@ -8,8 +8,9 @@ import torchvision.models as models
 from torch.autograd import Variable
 import torch.nn.init as init
 import numpy as np
-import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import matplotlib
+matplotlib.use('Agg')
 
 import config as args
 
@@ -64,7 +65,7 @@ class COM_CNN(nn.Module):
     def init_weight(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                init.xavier_uniform(m.weight, gain=np.sqrt(2.0))
+                init.xavier_uniform_(m.weight, gain=np.sqrt(2.0))
 
     def forward(self, x):
         x = self.conv1(x)
@@ -95,9 +96,9 @@ class COM_net_sim(nn.Module):
     def init_hidden(self):
         ### two variables: (h0, c0)
         return (autograd.Variable(torch.zeros(1, self.batch_size,
-            HIDDEN_SIZE).cuda()),
+            HIDDEN_SIZE).cpu()),
                 autograd.Variable(torch.zeros(1, self.batch_size,
-                    HIDDEN_SIZE).cuda()))
+                    HIDDEN_SIZE).cpu()))
 
     def get_img_feature_len(self):
         test = torch.rand(1, 1, WIDTH, HEIGHT)
@@ -224,9 +225,9 @@ class COM_net_nomem(nn.Module):
     def init_hidden(self):
         ### two variables: (h0, c0)
         return (autograd.Variable(torch.zeros(1, self.batch_size,
-            HIDDEN_SIZE).cuda()),
+            HIDDEN_SIZE).cpu()),
                 autograd.Variable(torch.zeros(1, self.batch_size,
-                    HIDDEN_SIZE).cuda()))
+                    HIDDEN_SIZE).cpu()))
 
     def get_img_feature_len(self):
         test = torch.rand(1, 1, WIDTH, HEIGHT)
@@ -262,7 +263,7 @@ def get_num_parameters(model):
 
 if __name__=='__main__':
     net = COM_net_sim(args.batch_size)
-    print get_num_parameters(net)
+    print(get_num_parameters(net))
 
 
 

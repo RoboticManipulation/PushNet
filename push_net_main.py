@@ -18,6 +18,8 @@ import os
 
 import config as args
 from img_utils import * ## utility function to manipulate images
+import matplotlib
+matplotlib.use('Agg')
 
 
 ''' Dimension of input image'''
@@ -35,10 +37,10 @@ METHOD = 'simcom' ## Original Push-Net
 #METHOD = 'nomem' ## Push-Net without LSTM
 
 ''' visualization options '''
-CURR_VIS = True # display current image
-NEXT_VIS = True # display target image
+CURR_VIS = False # display current image
+NEXT_VIS = False # display target image
 SAMPLE_VIS = False # display all sampled actions
-BEST_VIS = True # display the best action
+BEST_VIS = False # display the best action
 
 
 def to_var(x, volatile=False):
@@ -49,6 +51,7 @@ def to_var(x, volatile=False):
 '''deep neural network predictor'''
 class Predictor:
     def __init__(self):
+        print("Debug Info: init predictor")
         self.bs = args.batch_size
         model_path = 'model'
         best_model_name = args.arch[METHOD] + '.pth.tar'
@@ -57,12 +60,19 @@ class Predictor:
         self.load_model()
 
     def load_model(self):
-        self.model.load_state_dict(torch.load(self.model_path)['state_dict'])
+        print("Debug Info: load model")
         if torch.cuda.is_available():
+            # Load the model on CPU and then move it to GPU (if available)
+            state_dict = torch.load(self.model_path, map_location=torch.device('cpu'))['state_dict']
+            self.model.load_state_dict(state_dict)
             self.model.cuda()
+        else:
+            # Load the model on CPU
+            self.model.load_state_dict(torch.load(self.model_path, map_location=torch.device('cpu'))['state_dict'])
         self.model.eval()
 
     def build_model(self):
+        print("Debug Info: build model")
         if METHOD == 'simcom':
             return COM_net_sim(self.bs)
         elif METHOD == 'sim':
@@ -71,10 +81,12 @@ class Predictor:
             return COM_net_nomem(self.bs)
 
     def reset_model(self):
+        print("Debug Info: reset model")
         ''' reset the hidden state of LSTM before pushing another new object '''
         self.model.hidden = self.model.init_hidden()
 
     def update(self, start, end, img_curr, img_goal):
+        print("Debug Info: update LSTM states after an action has been executed")
         ''' update LSTM states after an action has been executed'''
 
         bs = self.bs
@@ -105,6 +117,7 @@ class Predictor:
             sim_out = self.model(A1, I1, A1, Ig, [1 for i in range(bs)], bs)
 
     def evaluate_action(self, img_curr, img_goal, actions):
+        print("Debug Info: calculate sim score of actions")
         ''' calculate the similarity score of actions '''
         bs = self.bs
         A1 = []
@@ -158,6 +171,7 @@ class Predictor:
 ''' Push Controller '''
 class PushController:
     def __init__(self):
+        print("Debug Info: init PushController")
         self.num_action = args.num_action
         self.bs = args.batch_size
         ''' goal specification '''
@@ -172,6 +186,7 @@ class PushController:
 
 
     def sample_action(self, img, num_actions):
+        print("Debug Info: sample [num_actions] numbers of push action candidates from current img")
         ''' sample [num_actions] numbers of push action candidates from current img'''
         s = 0.9
         safe_margin = 1.4
@@ -180,20 +195,24 @@ class PushController:
         ## get indices of end push points inside object mask
         img_inner = cv2.resize(img.copy(), (0,0), fx=s, fy=s, interpolation=cv2.INTER_AREA)
         h, w = img_inner.shape
+
+        print("Debug Info: H, W, h, w:", H, W, h, w)
+        print("Debug Info: Slice Indices:", (int(H)-h)//2, (int(H)+h)//2, (int(W)-w)//2, (int(W)+w)//2)
+
         img_end = np.zeros((int(H), int(W)))
-        img_end[(int(H)-h)/2:(int(H)+h)/2, (int(W)-w)/2:(int(W)+w)/2] = img_inner.copy()
+        img_end[int((H-h)/2):int((H+h)/2), int((W-w)/2):int((W+w)/2)] = img_inner.copy()
         (inside_y, inside_x) = np.where(img_end.copy()>0)
 
         ## get indices of start push points outside a safe margin of object
         img_outer1 = cv2.resize(img.copy(), (0,0), fx=safe_margin, fy=safe_margin, interpolation=cv2.INTER_CUBIC)
         h, w = img_outer1.shape
         img_start_safe = np.zeros((int(H), int(W)))
-        img_start_safe = img_outer1.copy()[(h-int(H))/2:(h+int(H))/2, (w-int(W))/2:(w+int(W))/2]
+        img_start_safe = img_outer1.copy()[int((h-int(H))/2):int((h+int(H))/2), int((w-int(W))/2):int((w+int(W))/2)]
 
         img_outer2 = cv2.resize(img.copy(), (0,0), fx=out_margin, fy=out_margin, interpolation=cv2.INTER_CUBIC)
         h, w = img_outer2.shape
         img_start_out = np.zeros((int(H), int(W)))
-        img_start_out = img_outer2.copy()[(h-int(H))/2:(h+int(H))/2, (w-int(W))/2:(w+int(W))/2]
+        img_start_out = img_outer2.copy()[int((h-int(H))/2):int((h+int(H))/2), int((w-int(W))/2):int((w+int(W))/2)]
 
         img_start = img_start_out.copy() - img_start_safe.copy()
         (outside_y, outside_x) = np.where(img_start.copy()>100)
@@ -218,7 +237,7 @@ class PushController:
                 start_y = int(outside_y[outside_idx])
 
                 if start_x < 0 or start_x >= W or start_y < 0 or start_y >= H:
-                    print 'out of bound'
+                    print('out of bound')
                     continue
                 if img[start_y, start_x] == 0:
                     break
@@ -234,6 +253,7 @@ class PushController:
 
 
     def get_best_push(self, Ic):
+        print("Debug Info: get_best_push")
         ''' Input:
                 Ic: current image mask
         '''
@@ -282,6 +302,8 @@ class PushController:
 
         action_value_pairs = []
 
+        num_action_batch = int(num_action_batch)
+
         for i in range(num_action_batch):
             ## keep hidden state the same for all action batches during selection
             if not hidden == None:
@@ -308,6 +330,7 @@ class PushController:
 
         ''' update LSTM hidden state '''
         self.pred.update(best_start, best_end, img_in_curr, img_in_next)
+        print("Debug Info: end best push")
 
 
     def draw_action(self, img, start, end, single=True):
@@ -327,7 +350,7 @@ class PushController:
         cv2.imshow('action', img_3d)
         if single:
             ## draw the best action
-            print 'press any key to continue ...'
+            print('press any key to continue ...')
             cv2.waitKey(0)
         else:
             ## draw all sample actions

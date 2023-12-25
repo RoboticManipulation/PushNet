@@ -23,7 +23,7 @@ srv_gen/
 .cproject
 
 # ignore txt file
-*.txt
+
 !CMakeLists.txt
 *.data
 *.json

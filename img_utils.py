@@ -2,7 +2,8 @@
 import imutils
 import cv2
 import numpy as np
-
+import matplotlib
+matplotlib.use('Agg')
 
 W = 124
 H = 106
@@ -123,10 +124,10 @@ def test_transform():
     cv2.waitKey(0)
 
     ## estimate transformation
-    print 'true transformation:'
-    print y, x, w
-    print 'estimated transformation:'
-    print get_img_transform(img.copy(), img_f.copy())
+    print('true transformation:')
+    print(y, x, w)
+    print('estimated transformation:')
+    print(get_img_transform(img.copy(), img_f.copy()))
 
 #test_transform()
 
